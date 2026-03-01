@@ -1,0 +1,115 @@
+.page {
+  padding: 40px 28px;
+  max-width: 480px;
+}
+
+.back {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 28px;
+  font-family: 'DM Sans', sans-serif;
+  transition: color 0.15s;
+}
+.back:hover { color: #f2f2f2; }
+
+.heading {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
+}
+
+.sub {
+  color: #555;
+  font-size: 14px;
+  margin-bottom: 36px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Cover placeholder */
+.coverPreview {
+  width: 120px;
+  height: 120px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1e1e1e, #2a2a2a);
+  border: 2px dashed #2e2e2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.coverIcon {
+  font-size: 40px;
+  opacity: 0.4;
+}
+
+/* Field */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.req { color: #ff5500; }
+
+.input {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #181818;
+  border: 1px solid #2e2e2e;
+  border-radius: 8px;
+  color: #f2f2f2;
+  font-size: 15px;
+  outline: none;
+  font-family: 'DM Sans', sans-serif;
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: #ff5500; }
+.inputError { border-color: #ff4444 !important; }
+
+.errorText {
+  font-size: 11px;
+  color: #ff4444;
+}
+
+/* Submit */
+.submitBtn {
+  padding: 13px;
+  background-color: #ff5500;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.02em;
+  transition: background-color 0.15s, transform 0.1s;
+}
+.submitBtn:hover:not(:disabled) { background-color: #ff7733; }
+.submitBtn:active:not(:disabled) { transform: scale(0.98); }
+.submitBtn:disabled { background-color: #222; color: #555; cursor: not-allowed; }
+
+.apiError {
+  font-size: 13px;
+  color: #ff6b6b;
+  padding: 12px 16px;
+  background-color: #1e1010;
+  border: 1px solid rgba(255,107,107,0.2);
+  border-radius: 8px;
+}
