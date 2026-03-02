@@ -1,0 +1,169 @@
+.page { min-height: 100vh; }
+
+/* ── Hero ── */
+.hero {
+  position: relative;
+  padding: 48px 40px 40px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.heroBg {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 20% 50%, rgba(255,85,0,0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+.heroContent {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column;
+  align-items: flex-start; gap: 10px;
+  max-width: 600px;
+}
+
+/* Avatar */
+.avatarWrap {
+  position: relative; width: 80px; height: 80px;
+}
+.avatarImg {
+  width: 80px; height: 80px;
+  border-radius: 50%; object-fit: cover;
+  border: 3px solid rgba(255,85,0,0.4);
+  display: block;
+}
+.avatarFallback {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 800;
+  color: #fff; font-family: var(--font-display);
+  border: 3px solid rgba(255,85,0,0.4);
+}
+.providerBadge {
+  position: absolute; bottom: 2px; right: 2px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #222; border: 2px solid #111;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Name */
+.nameRow { display: flex; align-items: center; gap: 10px; }
+.displayName {
+  font-family: var(--font-display);
+  font-size: 28px; font-weight: 800;
+  letter-spacing: -0.5px; color: var(--text-1);
+}
+.editBtn {
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  border-radius: 7px; padding: 5px 7px; cursor: pointer;
+  color: var(--text-3); display: flex; align-items: center;
+  transition: all 0.15s;
+}
+.editBtn:hover { background: rgba(255,255,255,0.1); color: var(--text-1); }
+
+/* Name edit input */
+.nameEdit { display: flex; align-items: center; gap: 8px; }
+.nameInput {
+  padding: 8px 14px; background: var(--bg-2);
+  border: 1px solid rgba(255,85,0,0.4);
+  border-radius: 8px; color: var(--text-1);
+  font-size: 18px; font-family: var(--font-display);
+  font-weight: 700; outline: none; min-width: 200px;
+}
+.saveBtn {
+  padding: 8px 16px; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; font-weight: 700;
+  font-size: 13px; cursor: pointer;
+  transition: background 0.15s;
+}
+.saveBtn:hover { background: var(--accent-2); }
+.cancelBtn {
+  padding: 8px 14px; background: none;
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-2); font-size: 13px; cursor: pointer;
+  transition: all 0.15s;
+}
+.cancelBtn:hover { border-color: var(--text-3); color: var(--text-1); }
+.saveMsg { font-size: 12px; color: var(--accent); font-family: var(--font-mono); }
+
+.emailText { font-size: 14px; color: var(--text-2); }
+.joinText { font-size: 12px; color: var(--text-3); }
+
+/* ── Stats ── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px; padding: 32px 40px;
+}
+.statCard {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 14px; padding: 24px 20px;
+  display: flex; flex-direction: column;
+  align-items: flex-start; gap: 6px;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.statCard:hover {
+  background: var(--bg-2);
+  border-color: rgba(255,85,0,0.2);
+  transform: translateY(-2px);
+}
+.statIcon { font-size: 20px; }
+.statValue {
+  font-family: var(--font-display);
+  font-size: 32px; font-weight: 800;
+  color: var(--text-1); letter-spacing: -1px;
+}
+.statLabel { font-size: 12px; color: var(--text-3); font-weight: 500; }
+
+/* ── Top played ── */
+.section { padding: 0 40px 32px; }
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 18px; font-weight: 700;
+  margin-bottom: 16px; letter-spacing: -0.2px;
+}
+.topList { display: flex; flex-direction: column; gap: 4px; }
+.topRow {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 14px; border-radius: 10px;
+  transition: background 0.12s;
+}
+.topRow:hover { background: var(--bg-1); }
+.topNum {
+  width: 20px; text-align: center;
+  font-size: 12px; color: var(--text-3);
+  font-family: var(--font-mono); flex-shrink: 0;
+}
+.topThumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+.topInfo { flex: 1; overflow: hidden; }
+.topTitle {
+  font-size: 13px; font-weight: 600; color: var(--text-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topArtist { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.topPlays {
+  font-size: 11px; color: var(--accent);
+  font-family: var(--font-mono); font-weight: 500;
+  white-space: nowrap; flex-shrink: 0;
+}
+
+/* ── Footer ── */
+.footer { padding: 0 40px 60px; }
+.signOutBtn {
+  padding: 10px 24px;
+  background: none;
+  border: 1px solid rgba(255,68,68,0.3);
+  border-radius: 8px; color: #ff6666;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.15s;
+}
+.signOutBtn:hover { background: rgba(255,68,68,0.08); border-color: rgba(255,68,68,0.6); }
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .hero { padding: 28px 20px; }
+  .statsGrid { grid-template-columns: repeat(2, 1fr); padding: 20px; gap: 12px; }
+  .statValue { font-size: 24px; }
+  .section, .footer { padding-left: 20px; padding-right: 20px; }
+}

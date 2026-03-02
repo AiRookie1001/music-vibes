@@ -1,158 +1,145 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAudio } from '@/context/AudioContext'
+import { useAuth } from '@/context/AuthContext'
+import AddToPlaylist from '@/components/AddToPlaylist'
+import EditSongModal from '@/components/EditSongModal'
 import styles from './Home.module.css'
 
+const GENRES = ['All', 'Hip-Hop', 'Pop', 'R&B', 'Rock', 'Electronic', 'Jazz', 'Classical', 'Lo-fi', 'Afrobeats', 'Latin', 'Country', 'Other']
+
 export default function Home() {
-  const [songs, setSongs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [hoveredId, setHoveredId] = useState(null)
-  const [playlists, setPlaylists] = useState([])
-  const [openMenuId, setOpenMenuId] = useState(null)
-  const [addingTo, setAddingTo] = useState(null)
-  const [toastMsg, setToastMsg] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [editingSong, setEditingSong] = useState(null) // { id, title, artist }
-  const [editValues, setEditValues] = useState({ title: '', artist: '' })
-  const [deletingId, setDeletingId] = useState(null)
-  const menuRef = useRef(null)
+  const router = useRouter()
+  const { user, isAdmin } = useAuth()
+
+  const [songs, setSongs]         = useState([])
+  const [likedIds, setLikedIds]   = useState(new Set())
+  const [loading, setLoading]     = useState(true)
+  const [search, setSearch]       = useState('')
+  const [activeGenre, setActiveGenre] = useState('All')
+  const [editSong, setEditSong]   = useState(null)
+
+  // Hero
+  const [heroIndex, setHeroIndex]     = useState(0)
+  const [heroBg, setHeroBg]           = useState('')
+  const [heroVisible, setHeroVisible] = useState(true)
+  const heroTimerRef = useRef(null)
 
   const { playSongAtIndex, setPlaylist, currentSong, isPlaying, togglePlay } = useAudio()
 
-  useEffect(() => { loadSongs(); loadPlaylists() }, [])
+  useEffect(() => { loadSongs() }, [])
+  useEffect(() => {
+    if (user) loadLikedIds()
+    else setLikedIds(new Set())
+  }, [user])
+
+  // Hero auto-rotate every 6s
+  useEffect(() => {
+    if (songs.length < 2) return
+    heroTimerRef.current = setInterval(() => {
+      setHeroVisible(false)
+      setTimeout(() => {
+        setHeroIndex(prev => (prev + 1) % Math.min(songs.length, 5))
+        setHeroVisible(true)
+      }, 400)
+    }, 6000)
+    return () => clearInterval(heroTimerRef.current)
+  }, [songs])
 
   useEffect(() => {
-    function handleClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpenMenuId(null)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
+    if (songs[heroIndex]) setHeroBg(songs[heroIndex].thumbnail_url || '')
+  }, [heroIndex, songs])
 
   async function loadSongs() {
-    const { data, error } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
-    if (!error) { setSongs(data); setPlaylist(data) }
+    const { data, error } = await supabase
+      .from('songs').select('*').order('created_at', { ascending: false })
+    if (!error && data) { setSongs(data); setPlaylist(data) }
     setLoading(false)
   }
 
-  async function loadPlaylists() {
-    const { data } = await supabase.from('playlists').select('id, title').order('created_at', { ascending: false })
-    if (data) setPlaylists(data)
+  async function loadLikedIds() {
+    const { data } = await supabase
+      .from('liked_songs').select('song_id').eq('user_id', user.id)
+    if (data) setLikedIds(new Set(data.map(r => r.song_id)))
   }
 
-  // Filtered songs based on search
-  const filteredSongs = songs.filter(s =>
-    s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.artist.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  function handleSongClick(song, index) {
-    if (openMenuId) { setOpenMenuId(null); return }
+  function handleHeroPlay() {
+    const song = songs[heroIndex]
+    if (!song) return
     if (currentSong?.id === song.id) togglePlay()
-    else {
-      // Play within filtered context if searching, else full playlist
-      const playlistToUse = searchQuery ? filteredSongs : songs
-      const actualIndex = playlistToUse.findIndex(s => s.id === song.id)
-      setPlaylist(playlistToUse)
-      playSongAtIndex(actualIndex)
-    }
+    else { setPlaylist(songs); playSongAtIndex(heroIndex) }
   }
 
-  function toggleMenu(e, songId) {
-    e.stopPropagation()
-    setOpenMenuId(prev => prev === songId ? null : songId)
+  function goHero(i) {
+    setHeroVisible(false)
+    setTimeout(() => { setHeroIndex(i); setHeroVisible(true) }, 300)
+    clearInterval(heroTimerRef.current)
   }
 
-  async function addToPlaylist(e, song, playlistId) {
+  async function handleLike(e, song) {
     e.stopPropagation()
-    setAddingTo(playlistId)
-
-    const { data: existing } = await supabase
-      .from('playlist_songs').select('id')
-      .eq('playlist_id', playlistId).eq('song_id', song.id).single()
-
-    if (existing) {
-      showToast('Already in this playlist')
-      setAddingTo(null); setOpenMenuId(null); return
-    }
-
-    const { data: last } = await supabase
-      .from('playlist_songs').select('order')
-      .eq('playlist_id', playlistId).order('order', { ascending: false }).limit(1).single()
-
-    await supabase.from('playlist_songs').insert({
-      playlist_id: playlistId, song_id: song.id, order: last ? (last.order || 0) + 1 : 1
+    if (!user) { router.push('/login?next=/'); return }
+    const isLiked = likedIds.has(song.id)
+    setLikedIds(prev => {
+      const next = new Set(prev)
+      isLiked ? next.delete(song.id) : next.add(song.id)
+      return next
     })
-
-    setAddingTo(null); setOpenMenuId(null)
-    const pl = playlists.find(p => p.id === playlistId)
-    showToast(`Added to "${pl?.title}"`)
+    if (isLiked) {
+      await supabase.from('liked_songs').delete().eq('user_id', user.id).eq('song_id', song.id)
+    } else {
+      await supabase.from('liked_songs').insert({ user_id: user.id, song_id: song.id })
+    }
   }
 
   async function deleteSong(e, song) {
     e.stopPropagation()
-    if (!confirm(`Delete "${song.title}"? This cannot be undone.`)) return
-    setDeletingId(song.id)
-
-    // Remove from playlist_songs first
-    await supabase.from('playlist_songs').delete().eq('song_id', song.id)
-
-    // Delete audio + thumbnail from storage
-    const audioFileName = song.audio_url?.split('/audio/')[1]
-    const thumbFileName = song.thumbnail_url?.split('/thumbnails/')[1]
-    if (audioFileName) await supabase.storage.from('audio').remove([audioFileName])
-    if (thumbFileName) await supabase.storage.from('thumbnails').remove([thumbFileName])
-
-    // Delete from DB
+    if (!isAdmin || !confirm(`Delete "${song.title}"?`)) return
     await supabase.from('songs').delete().eq('id', song.id)
-
     setSongs(prev => prev.filter(s => s.id !== song.id))
-    setDeletingId(null)
-    setOpenMenuId(null)
-    showToast(`"${song.title}" deleted`)
   }
 
-  function startEdit(e, song) {
-    e.stopPropagation()
-    setEditingSong(song)
-    setEditValues({ title: song.title, artist: song.artist })
-    setOpenMenuId(null)
+  function handleSongClick(song) {
+    const list = getFiltered()
+    const idx  = list.findIndex(s => s.id === song.id)
+    if (currentSong?.id === song.id) togglePlay()
+    else { setPlaylist(list); playSongAtIndex(idx) }
   }
 
-  async function saveEdit() {
-    if (!editValues.title.trim() || !editValues.artist.trim()) return
-    const { error } = await supabase
-      .from('songs')
-      .update({ title: editValues.title.trim(), artist: editValues.artist.trim() })
-      .eq('id', editingSong.id)
-
-    if (!error) {
-      setSongs(prev => prev.map(s =>
-        s.id === editingSong.id
-          ? { ...s, title: editValues.title.trim(), artist: editValues.artist.trim() }
-          : s
-      ))
-      showToast('Song updated')
-    }
-    setEditingSong(null)
+  function getFiltered() {
+    return songs.filter(s => {
+      const q = search.toLowerCase()
+      const matchSearch = !search
+        || s.title.toLowerCase().includes(q)
+        || s.artist.toLowerCase().includes(q)
+      const matchGenre = activeGenre === 'All'
+        || (s.tags && s.tags.includes(activeGenre))
+        || s.genre === activeGenre
+      return matchSearch && matchGenre
+    })
   }
 
-  function showToast(msg) {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(''), 2500)
-  }
+  const fmt = s => (!s || s <= 0)
+    ? '' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+
+  const filtered      = getFiltered()
+  const heroSong      = songs[heroIndex]
+  const isHeroPlaying = currentSong?.id === heroSong?.id && isPlaying
 
   if (loading) return (
     <div className={styles.page}>
-      <h1 className={styles.heading}>All Songs</h1>
-      <div className={styles.grid}>
+      <div className={styles.heroSkeleton} />
+      <div className={styles.grid} style={{ padding: '24px 40px' }}>
         {[...Array(8)].map((_, i) => (
-          <div key={i} className={styles.skeletonCard}>
-            <div className={styles.skeletonCover} />
-            <div className={styles.skeletonLine} style={{ width: '75%' }} />
-            <div className={styles.skeletonLine} style={{ width: '45%' }} />
+          <div key={i} className={styles.skeleton}>
+            <div className={styles.skelCover} />
+            <div className={styles.skelInfo}>
+              <div className={styles.skelLine} style={{ width: '70%' }} />
+              <div className={styles.skelLine} style={{ width: '45%' }} />
+            </div>
           </div>
         ))}
       </div>
@@ -160,142 +147,160 @@ export default function Home() {
   )
 
   return (
-    <div className={styles.page} ref={menuRef}>
+    <div className={styles.page}>
 
-      {/* Edit Modal */}
-      {editingSong && (
-        <div className={styles.modalOverlay} onClick={() => setEditingSong(null)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Edit Song</h3>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Title</label>
-              <input
-                className={styles.modalInput}
-                value={editValues.title}
-                onChange={e => setEditValues(v => ({ ...v, title: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                autoFocus
-              />
+      {/* ══ HERO ══ */}
+      {songs.length > 0 && (
+        <section className={styles.hero}>
+          <div className={styles.heroBg}
+            style={{ backgroundImage: `url(${heroBg})` }}
+            key={heroIndex} />
+          <div className={styles.heroScrim} />
+
+          <div className={`${styles.heroContent} ${heroVisible ? styles.heroIn : styles.heroOut}`}>
+            <div className={styles.heroArt}>
+              <img src={heroSong?.thumbnail_url || '/placeholder.jpg'} alt="" className={styles.heroImg} />
+              {isHeroPlaying && <div className={styles.heroPlayingRing} />}
             </div>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Artist</label>
-              <input
-                className={styles.modalInput}
-                value={editValues.artist}
-                onChange={e => setEditValues(v => ({ ...v, artist: e.target.value }))}
-                onKeyDown={e => e.key === 'Enter' && saveEdit()}
-              />
-            </div>
-            <div className={styles.modalActions}>
-              <button className={styles.modalCancel} onClick={() => setEditingSong(null)}>Cancel</button>
-              <button className={styles.modalSave} onClick={saveEdit}>Save</button>
+            <div className={styles.heroInfo}>
+              <p className={styles.heroLabel}>
+                {currentSong?.id === heroSong?.id ? '▶ Now Playing' : 'Featured'}
+              </p>
+              <h1 className={styles.heroTitle}>{heroSong?.title}</h1>
+              <p className={styles.heroArtist}>{heroSong?.artist}</p>
+              <button className={styles.heroPlayBtn} onClick={handleHeroPlay}>
+                {isHeroPlaying ? (
+                  <><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause</>
+                ) : (
+                  <><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>Play Now</>
+                )}
+              </button>
             </div>
           </div>
-        </div>
+
+          {songs.length > 1 && (
+            <div className={styles.heroDots}>
+              {Array.from({ length: Math.min(songs.length, 5) }).map((_, i) => (
+                <button key={i}
+                  className={`${styles.dot} ${i === heroIndex ? styles.dotActive : ''}`}
+                  onClick={() => goHero(i)} />
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
+      {/* ══ HEADER + SEARCH ══ */}
       <div className={styles.header}>
-        <div>
-          <h1 className={styles.heading}>All Songs</h1>
-          <p className={styles.sub}>{songs.length} tracks</p>
+        <div className={styles.headerLeft}>
+          <h2 className={styles.sectionTitle}>All Music</h2>
+          <p className={styles.sectionSub}>{filtered.length} of {songs.length} tracks</p>
         </div>
-        {/* Search bar */}
-        <div className={styles.searchWrap}>
-          <span className={styles.searchIcon}>🔍</span>
-          <input
-            type="text"
-            placeholder="Search songs or artists..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className={styles.searchInput}
-          />
-          {searchQuery && (
-            <button className={styles.searchClear} onClick={() => setSearchQuery('')}>✕</button>
-          )}
+        <div className={styles.headerRight}>
+          <div className={styles.searchWrap}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" className={styles.searchIcon}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" placeholder="Search songs…"
+              value={search} onChange={e => setSearch(e.target.value)}
+              className={styles.search} />
+          </div>
         </div>
       </div>
 
-      {filteredSongs.length === 0 && searchQuery ? (
-        <div className={styles.noResults}>
-          <p>No songs found for "<strong>{searchQuery}</strong>"</p>
+      {/* Genre chips */}
+      {songs.length > 0 && (
+        <div className={styles.genreStrip}>
+          {GENRES.map(g => (
+            <button key={g}
+              className={`${styles.genreChip} ${activeGenre === g ? styles.genreChipActive : ''}`}
+              onClick={() => setActiveGenre(g)}>{g}</button>
+          ))}
         </div>
-      ) : songs.length === 0 ? (
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>🎵</div>
-          <h2>No songs yet</h2>
-          <p className={styles.emptySub}>Add your first song from YouTube</p>
-          <a href="/add-song" className={styles.emptyBtn}>+ Upload a song</a>
-        </div>
-      ) : (
-        <div className={styles.grid}>
-          {filteredSongs.map((song, index) => {
-            const isActive = currentSong?.id === song.id
-            const isHovered = hoveredId === song.id
-            const menuOpen = openMenuId === song.id
+      )}
 
+      {/* Empty states */}
+      {songs.length === 0 && (
+        <div className={styles.empty}>
+          <p className={styles.emptyIcon}>🎵</p>
+          <h2 className={styles.emptyTitle}>No music yet</h2>
+          <p className={styles.emptyText}>{user ? 'Upload the first song' : 'Sign in to upload music'}</p>
+          <a href={user ? '/add-song' : '/login'} className={styles.emptyBtn}>
+            {user ? 'Upload music →' : 'Sign in →'}
+          </a>
+        </div>
+      )}
+      {songs.length > 0 && filtered.length === 0 && (
+        <div className={styles.empty}>
+          <p className={styles.emptyText}>No songs match your search</p>
+          <button className={styles.emptyBtn} onClick={() => { setSearch(''); setActiveGenre('All') }}
+            style={{ background: 'none', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}>
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      {/* ══ SONG GRID ══ */}
+      {filtered.length > 0 && (
+        <div className={styles.grid}>
+          {filtered.map(song => {
+            const isActive = currentSong?.id === song.id
+            const isLiked  = likedIds.has(song.id)
             return (
-              <div
-                key={song.id}
-                className={`${styles.card} ${isActive ? styles.activeCard : ''} ${deletingId === song.id ? styles.deletingCard : ''}`}
-                onClick={() => handleSongClick(song, index)}
-                onMouseEnter={() => setHoveredId(song.id)}
-                onMouseLeave={() => setHoveredId(null)}
-              >
-                <div className={styles.cover}>
-                  <img src={song.thumbnail_url || ''} alt={song.title} className={styles.coverImg} />
-                  <div className={`${styles.playOverlay} ${isHovered || isActive ? styles.overlayVisible : ''}`}>
-                    <div className={styles.playCircle}>
-                      {isActive && isPlaying ? '⏸' : '▶'}
+              <div key={song.id}
+                className={`${styles.card} ${isActive ? styles.cardActive : ''}`}
+                onClick={() => handleSongClick(song)}>
+
+                <div className={styles.thumb}>
+                  <img src={song.thumbnail_url || '/placeholder.jpg'} alt={song.title} className={styles.thumbImg} />
+                  <div className={`${styles.thumbOverlay} ${isActive ? styles.thumbOverlayOn : ''}`}>
+                    <div className={styles.playBtn}>
+                      {isActive && isPlaying
+                        ? <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        : <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>}
                     </div>
                   </div>
-                  {isActive && isPlaying && <div className={styles.playingBadge}>▶ PLAYING</div>}
-                </div>
+                  {song.duration_seconds > 0 && <div className={styles.durationBadge}>{fmt(song.duration_seconds)}</div>}
+                  {isActive && isPlaying && <div className={styles.badge}>LIVE</div>}
 
-                <div className={styles.cardBody}>
-                  <div className={styles.cardText}>
-                    <div className={`${styles.cardTitle} ${isActive ? styles.activeTitle : ''}`}>{song.title}</div>
-                    <div className={styles.cardArtist}>{song.artist}</div>
-                  </div>
-
-                  {/* Options button */}
-                  <div className={styles.menuWrap}>
-                    <button
-                      className={`${styles.menuBtn} ${isHovered || menuOpen ? styles.menuBtnVisible : ''}`}
-                      onClick={(e) => toggleMenu(e, song.id)}
-                      title="Options"
-                    >⋮</button>
-
-                    {menuOpen && (
-                      <div className={styles.dropdown} onClick={e => e.stopPropagation()}>
-                        {/* Add to playlist submenu header */}
-                        <p className={styles.dropdownLabel}>Add to playlist</p>
-                        {playlists.length === 0 ? (
-                          <a href="/playlists/create" className={styles.dropdownItem} style={{ color: '#ff5500' }}>
-                            + Create a playlist
-                          </a>
-                        ) : (
-                          playlists.map(pl => (
-                            <button key={pl.id} className={styles.dropdownItem}
-                              onClick={(e) => addToPlaylist(e, song, pl.id)}
-                              disabled={addingTo === pl.id}>
-                              {addingTo === pl.id ? '⏳' : '🎵'} {pl.title}
-                            </button>
-                          ))
-                        )}
-                        <div className={styles.dropdownDivider} />
-                        <button className={styles.dropdownItem} onClick={(e) => startEdit(e, song)}>
-                          ✏️ Edit details
+                  <div className={styles.topActions} onClick={e => { e.stopPropagation(); e.preventDefault() }}>
+                    {user && <AddToPlaylist song={song} />}
+                    {isAdmin && (
+                      <>
+                        <button onClick={e => { e.stopPropagation(); setEditSong(song) }} title="Edit" className={styles.actionBtn}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
                         </button>
-                        <button
-                          className={`${styles.dropdownItem} ${styles.deleteItem}`}
-                          onClick={(e) => deleteSong(e, song)}
-                          disabled={deletingId === song.id}
-                        >
-                          {deletingId === song.id ? '⏳ Deleting...' : '🗑️ Delete song'}
+                        <button onClick={e => deleteSong(e, song)} title="Delete" className={`${styles.actionBtn} ${styles.actionBtnDanger}`}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+                            <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                          </svg>
                         </button>
-                      </div>
+                      </>
                     )}
                   </div>
+                </div>
+
+                <div className={styles.info}>
+                  <div className={styles.infoText}>
+                    <p className={`${styles.songTitle} ${isActive ? styles.songTitleActive : ''}`}>{song.title}</p>
+                    <p className={styles.songArtist}>{song.artist}</p>
+                    {song.tags?.length > 0 && <p className={styles.genreTag}>{song.tags[0]}</p>}
+                  </div>
+                  <button
+                    className={`${styles.likeBtn} ${isLiked ? styles.likeBtnActive : ''}`}
+                    onClick={e => handleLike(e, song)}
+                    title={!user ? 'Sign in to like' : isLiked ? 'Unlike' : 'Like'}>
+                    <svg width="16" height="16" viewBox="0 0 24 24"
+                      fill={isLiked ? '#ff4466' : 'none'}
+                      stroke={isLiked ? '#ff4466' : 'currentColor'} strokeWidth="2">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
             )
@@ -303,7 +308,10 @@ export default function Home() {
         </div>
       )}
 
-      {toastMsg && <div className={styles.toast}>{toastMsg}</div>}
+      {editSong && isAdmin && (
+        <EditSongModal song={editSong} onClose={() => setEditSong(null)}
+          onSaved={updated => { setSongs(prev => prev.map(s => s.id === updated.id ? updated : s)); setEditSong(null) }} />
+      )}
     </div>
   )
 }

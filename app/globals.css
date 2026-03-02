@@ -1,57 +1,115 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* ── Design Tokens ── */
 :root {
-  --bg-base: #0e0e0e;
-  --bg-card: #181818;
-  --bg-elevated: #222222;
-  --bg-hover: #2a2a2a;
-  --border: #2e2e2e;
-  --accent: #ff5500;
-  --accent-hover: #ff7733;
-  --accent-dim: rgba(255, 85, 0, 0.15);
-  --text-primary: #f2f2f2;
-  --text-secondary: #999;
-  --text-muted: #555;
-  --player-bg: #111111;
-  --radius: 8px;
+  --bg:         #080808;
+  --bg-1:       #111111;
+  --bg-2:       #181818;
+  --bg-3:       #222222;
+  --border:     rgba(255,255,255,0.07);
+  --accent:     #ff5500;
+  --accent-2:   #ff8c00;
+  --accent-dim: rgba(255,85,0,0.12);
+  --text-1:     #f5f5f0;
+  --text-2:     #999;
+  --text-3:     #555;
+  --player-h:   80px;
+  --nav-h:      60px;
+  --mob-nav-h:  64px;
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'Outfit', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+  --radius:     10px;
+  --shadow:     0 8px 32px rgba(0,0,0,0.5);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-html, body {
-  height: 100%;
-  background-color: var(--bg-base);
-  color: var(--text-primary);
-  font-family: 'DM Sans', sans-serif;
+/* ── Reset ── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+  overflow-x: hidden;
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-base); }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #444; }
+/* ── Grain texture overlay — the secret sauce ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
 
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+/* ── Range inputs ── */
 input[type="range"] {
   -webkit-appearance: none;
-  appearance: none;
   height: 3px;
   border-radius: 2px;
-  background: var(--bg-elevated);
+  background: var(--bg-3);
   outline: none;
   cursor: pointer;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 0; height: 0;
   border-radius: 50%;
-  background: var(--text-primary);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s;
+  background: var(--text-1);
+  transition: width 0.15s, height 0.15s;
 }
-input[type="range"]:hover::-webkit-slider-thumb { opacity: 1; }
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 3px;
-  border-radius: 2px;
+input[type="range"]:hover::-webkit-slider-thumb {
+  width: 12px; height: 12px;
+}
+
+/* ── Keyframes ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes waveBar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
+}
+@keyframes bgBlur {
+  0%   { opacity: 0; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ── Utility classes ── */
+.fade-up   { animation: fadeUp 0.5s ease forwards; }
+.fade-in   { animation: fadeIn 0.4s ease forwards; }
+
+/* Bottom nav spacing on mobile */
+@media (max-width: 768px) {
+  body { padding-bottom: var(--mob-nav-h); }
 }

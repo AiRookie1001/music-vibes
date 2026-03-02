@@ -1,233 +1,303 @@
-/* ── Mini Player Bar ── */
-.player {
+/* ════════════════════════════
+   DESKTOP PLAYER BAR
+════════════════════════════ */
+.bar {
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  height: 76px;
-  background-color: #111;
-  border-top: 1px solid #1e1e1e;
+  height: var(--player-h);
+  background: rgba(10,10,10,0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 12px;
-  z-index: 100;
+  padding: 0 24px;
+  gap: 16px;
+  z-index: 80;
 }
 
-.progressBar {
+/* Progress line on top */
+.progressLine {
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 4px;
-  background-color: #222;
+  height: 3px;
+  background: var(--bg-3);
   cursor: pointer;
   transition: height 0.15s;
 }
-.progressBar:hover { height: 6px; }
+.progressLine:hover { height: 5px; }
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, #ff5500, #ff8c00);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
   transition: width 0.1s linear;
   pointer-events: none;
 }
 
-.songInfo {
+/* Left */
+.barLeft {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 220px;
-  min-width: 160px;
+  gap: 13px;
+  width: 240px;
+  min-width: 180px;
   flex-shrink: 0;
   cursor: pointer;
 }
-.thumbWrap { position: relative; flex-shrink: 0; }
-.thumb {
-  width: 46px; height: 46px;
-  border-radius: 5px; object-fit: cover; display: block;
+.barThumbWrap { position: relative; flex-shrink: 0; }
+.barThumb {
+  width: 48px; height: 48px;
+  border-radius: 6px; object-fit: cover; display: block;
 }
-.thumbBorder {
-  position: absolute; inset: 0;
-  border-radius: 5px;
-  border: 1.5px solid rgba(255,85,0,0.6);
+.barThumbRing {
+  position: absolute; inset: -3px;
+  border-radius: 8px;
+  border: 2px solid var(--accent);
+  opacity: 0.6;
+  animation: spin 8s linear infinite;
   pointer-events: none;
 }
-.songText { overflow: hidden; }
-.songTitle {
-  font-weight: 600; font-size: 13px; color: #f2f2f2;
+.barInfo { overflow: hidden; }
+.barTitle {
+  font-weight: 600; font-size: 13px; color: var(--text-1);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--font-body);
 }
-.songArtist { font-size: 11px; color: #666; margin-top: 2px; }
+.barArtist { font-size: 11px; color: var(--text-3); margin-top: 2px; }
 
-.controls {
+/* Center */
+.barCenter {
   flex: 1;
-  display: flex; align-items: center; justify-content: center;
-  gap: 4px;
+  display: flex; align-items: center;
+  justify-content: center; gap: 4px;
 }
 
-.iconBtn {
+/* Control buttons */
+.ctrl {
   background: none; border: none; cursor: pointer;
-  font-size: 22px; color: #bbb;
-  width: 48px; height: 48px;
+  font-size: 20px; color: var(--text-2);
+  width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 8px;
-  transition: color 0.15s, background-color 0.15s;
+  transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
-  will-change: color;
 }
-.iconBtn:hover { color: #fff; background-color: #1e1e1e; }
-.active { color: #ff5500; }
-.active:hover { color: #ff7733; background-color: #1e1e1e; }
+.ctrl:hover { color: var(--text-1); background: rgba(255,255,255,0.07); }
+.ctrlActive { color: var(--accent) !important; }
+.ctrlActive:hover { color: var(--accent-2) !important; }
 
-.playBtn {
-  width: 52px; height: 52px; border-radius: 50%;
-  background-color: #ff5500;
+.ctrlPlay {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--accent);
   border: none; cursor: pointer;
-  font-size: 20px; color: #fff;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; margin: 0 8px;
-  box-shadow: 0 2px 12px rgba(255,85,0,0.35);
-  transition: background-color 0.15s, transform 0.1s;
+  color: #fff; flex-shrink: 0; margin: 0 8px;
+  box-shadow: 0 0 24px rgba(255,85,0,0.35);
+  transition: background 0.15s, transform 0.1s;
 }
-.playBtn:hover { background-color: #ff7733; transform: scale(1.07); }
-.playBtn:active { transform: scale(0.96); }
+.ctrlPlay:hover { background: var(--accent-2); transform: scale(1.07); }
+.ctrlPlay:active { transform: scale(0.95); }
 
-.volumeSection {
-  display: flex; align-items: center; gap: 10px;
-  width: 240px; min-width: 200px;
+/* Right */
+.barRight {
+  display: flex; align-items: center;
+  gap: 8px; width: 240px; min-width: 180px;
   justify-content: flex-end; flex-shrink: 0;
 }
-.time {
-  font-size: 11px; color: #555;
-  font-family: 'DM Mono', monospace; white-space: nowrap;
+.barTime {
+  font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono); white-space: nowrap;
 }
-.volumeSlider {
-  width: 80px; accent-color: #ff5500; cursor: pointer;
+.volRow { display: flex; align-items: center; gap: 7px; }
+.volSlider {
+  width: 80px; accent-color: var(--accent); cursor: pointer;
 }
 
-/* ── Queue Drawer ── */
-.queueOverlay {
+/* ── Hide desktop bar on mobile ── */
+@media (max-width: 768px) {
+  .bar { display: none; }
+}
+
+/* ════════════════════════════
+   MOBILE MINI PLAYER PILL
+   sits just above bottom nav
+════════════════════════════ */
+.mobileMini {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobileMini {
+    display: flex;
+    position: fixed;
+    bottom: calc(var(--mob-nav-h) + 8px);
+    left: 12px; right: 12px;
+    height: 64px;
+    background: rgba(22,22,22,0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    align-items: center;
+    padding: 0 14px;
+    gap: 12px;
+    z-index: 85;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    animation: fadeUp 0.3s ease;
+    overflow: hidden;
+  }
+
+  /* Thin progress bar at bottom of pill */
+  .miniProgress {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 0 0 16px 16px;
+    overflow: hidden;
+  }
+  .miniProgressFill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    transition: width 0.1s linear;
+  }
+
+  .miniThumbWrap { position: relative; flex-shrink: 0; }
+  .miniThumb {
+    width: 44px; height: 44px;
+    border-radius: 10px; object-fit: cover; display: block;
+  }
+  .miniThumbRing {
+    position: absolute; inset: -2px;
+    border-radius: 12px;
+    border: 1.5px solid var(--accent);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .miniInfo {
+    flex: 1; overflow: hidden;
+  }
+  .miniTitle {
+    font-size: 13px; font-weight: 600; color: var(--text-1);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: var(--font-body);
+  }
+  .miniArtist { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+  .miniPlayBtn {
+    background: var(--accent);
+    border: none; cursor: pointer;
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .miniPlayBtn:hover { background: var(--accent-2); }
+
+  .miniNextBtn {
+    background: none; border: none; cursor: pointer;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-2); flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .miniNextBtn:hover { color: var(--text-1); }
+}
+
+/* ════════════════════════════
+   MOBILE EXPANDED PLAYER
+   (full screen, SoundCloud style)
+════════════════════════════ */
+.expanded {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
   z-index: 200;
-  display: flex; justify-content: flex-end;
-}
-.queueDrawer {
-  width: 340px;
-  max-width: 100vw;
-  height: 100vh;
-  background-color: #161616;
-  border-left: 1px solid #2a2a2a;
   display: flex; flex-direction: column;
-  animation: slideIn 0.25s ease;
-  padding-bottom: 80px;
+  align-items: center; padding: 0 28px 40px;
   overflow: hidden;
+  animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
 }
-@keyframes slideIn {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+
+.expandedBg {
+  position: absolute; inset: -20px;
+  background-size: cover; background-position: center;
+  filter: blur(50px) saturate(1.6) brightness(0.4);
+  transform: scale(1.1);
+  pointer-events: none;
 }
-.queueHeader {
+.expandedScrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(8,8,8,0.5) 0%,
+    rgba(8,8,8,0.2) 30%,
+    rgba(8,8,8,0.7) 100%
+  );
+  pointer-events: none;
+}
+
+.expandedHeader {
+  position: relative; z-index: 1;
   display: flex; align-items: center;
   justify-content: space-between;
-  padding: 20px 20px 16px;
-  border-bottom: 1px solid #222;
-  flex-shrink: 0;
+  width: 100%; padding-top: 54px;
+  margin-bottom: 20px;
 }
-.queueTitle { font-size: 16px; font-weight: 700; }
-.queueClose {
-  background: none; border: none; cursor: pointer;
-  color: #888; font-size: 16px;
-  width: 32px; height: 32px; border-radius: 50%;
+.expandedDown {
+  background: rgba(255,255,255,0.1);
+  border: none; cursor: pointer;
+  width: 36px; height: 36px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  transition: background-color 0.15s, color 0.15s;
+  color: var(--text-1); transition: background 0.15s;
 }
-.queueClose:hover { background-color: #2a2a2a; color: #fff; }
-
-.queueNowPlaying {
-  padding: 16px 20px;
-  border-bottom: 1px solid #1e1e1e;
-  flex-shrink: 0;
+.expandedDown:hover { background: rgba(255,255,255,0.2); }
+.expandedHeaderLabel {
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text-2); font-family: var(--font-display);
 }
-.queueLabel {
-  font-size: 10px; text-transform: uppercase;
-  letter-spacing: 0.1em; color: #ff5500;
-  font-weight: 600; display: block; margin-bottom: 10px;
-}
-.queueCurrentRow {
-  display: flex; align-items: center; gap: 12px;
-}
-.queueThumb {
-  width: 40px; height: 40px;
-  border-radius: 5px; object-fit: cover; flex-shrink: 0;
-}
-.queueSongTitle {
-  font-size: 13px; font-weight: 600; color: #f2f2f2;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.queueSongArtist { font-size: 11px; color: #555; margin-top: 2px; }
-
-.queueList { flex: 1; overflow-y: auto; padding: 8px 0; }
-.queueEmpty { color: #444; font-size: 13px; padding: 20px; text-align: center; }
-
-.queueRow {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 20px; cursor: pointer;
-  transition: background-color 0.12s;
-}
-.queueRow:hover { background-color: #1e1e1e; }
-.queueRowNum { font-size: 12px; color: #444; width: 16px; flex-shrink: 0; }
-.queueRowInfo { overflow: hidden; }
-
-/* ── Mobile Expanded Player ── */
-.expandedOverlay {
-  position: fixed; inset: 0;
-  z-index: 300;
-  background: #0e0e0e;
-  display: flex; align-items: center; justify-content: center;
-  animation: fadeUp 0.3s ease;
-}
-@keyframes fadeUp {
-  from { transform: translateY(100%); opacity: 0; }
-  to   { transform: translateY(0); opacity: 1; }
-}
-.expandedPlayer {
-  width: 100%;
-  max-width: 420px;
-  padding: 24px 32px 40px;
-  display: flex; flex-direction: column; align-items: center; gap: 24px;
-}
-.expandedClose {
-  align-self: flex-start;
-  background: none; border: none; cursor: pointer;
-  font-size: 24px; color: #888;
-  transition: color 0.15s;
-}
-.expandedClose:hover { color: #fff; }
 
 .expandedArt {
-  width: 100%;
-  max-width: 300px;
+  position: relative; z-index: 1;
+  width: min(280px, 75vw);
   aspect-ratio: 1;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+  margin-bottom: 8px;
 }
-.expandedImg { width: 100%; height: 100%; object-fit: cover; }
+.expandedArtImg { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.expandedInfo { text-align: center; width: 100%; }
+/* waveform overlay on art */
+.expandedArt .wave {
+  position: absolute; bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+}
+
+.expandedInfo {
+  position: relative; z-index: 1;
+  width: 100%; margin: 20px 0 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
 .expandedTitle {
-  font-size: 22px; font-weight: 700;
-  letter-spacing: -0.3px; margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 800;
+  color: var(--text-1); letter-spacing: -0.4px;
 }
-.expandedArtist { font-size: 14px; color: #666; }
+.expandedArtist { font-size: 14px; color: var(--text-2); margin-top: 4px; }
 
-.expandedProgress { width: 100%; }
-.expandedProgressBar {
+/* Progress */
+.expandedProgressWrap { position: relative; z-index: 1; width: 100%; margin-bottom: 8px; }
+.expandedProgressTrack {
   position: relative; height: 4px;
-  background-color: #2a2a2a; border-radius: 2px;
-  cursor: pointer; margin-bottom: 8px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px; cursor: pointer;
+  margin-bottom: 8px;
 }
-.expandedProgressBar:hover { height: 6px; }
+.expandedProgressTrack:hover { height: 6px; }
 .expandedProgressFill {
   position: absolute; top: 0; left: 0; height: 100%;
-  background: linear-gradient(90deg, #ff5500, #ff8c00);
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
   border-radius: 2px; pointer-events: none;
   transition: width 0.1s linear;
 }
@@ -235,54 +305,134 @@
   position: absolute; top: 50%;
   transform: translate(-50%, -50%);
   width: 14px; height: 14px; border-radius: 50%;
-  background-color: #fff;
-  pointer-events: none;
+  background: #fff; pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 .expandedTimes {
   display: flex; justify-content: space-between;
-  font-size: 11px; color: #555;
-  font-family: 'DM Mono', monospace;
+  font-size: 11px; color: var(--text-3);
+  font-family: var(--font-mono);
 }
 
+/* Controls */
 .expandedControls {
-  display: flex; align-items: center; justify-content: center;
-  gap: 8px; width: 100%;
+  position: relative; z-index: 1;
+  display: flex; align-items: center;
+  justify-content: center; gap: 12px;
+  width: 100%; margin-bottom: 24px;
 }
-.expandedIconBtn {
+.exBtn {
   background: none; border: none; cursor: pointer;
-  font-size: 24px; color: #888;
-  width: 52px; height: 52px;
+  font-size: 24px; color: rgba(255,255,255,0.6);
+  width: 52px; height: 52px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  transition: color 0.15s, background-color 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
-.expandedIconBtn:hover { color: #fff; background-color: #1e1e1e; }
-.activeIcon { color: #ff5500; }
+.exBtn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+.exBtnActive { color: var(--accent) !important; }
 
-.expandedPlayBtn {
-  width: 64px; height: 64px; border-radius: 50%;
-  background-color: #ff5500; border: none; cursor: pointer;
-  font-size: 26px; color: #fff;
+.exPlayBtn {
+  width: 68px; height: 68px; border-radius: 50%;
+  background: var(--accent);
+  border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 20px rgba(255,85,0,0.4);
-  transition: background-color 0.15s, transform 0.1s;
-  margin: 0 8px;
+  color: #fff; margin: 0 8px;
+  box-shadow: 0 0 40px rgba(255,85,0,0.5);
+  transition: background 0.15s, transform 0.1s;
 }
-.expandedPlayBtn:hover { background-color: #ff7733; transform: scale(1.05); }
+.exPlayBtn:hover { background: var(--accent-2); transform: scale(1.06); }
 
-.expandedVolume {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-}
-.expandedVolumeSlider {
-  flex: 1; accent-color: #ff5500; cursor: pointer;
+/* Volume */
+.expandedVol {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; color: var(--text-3);
 }
 
-/* Mobile: hide desktop volume on small screens */
-@media (max-width: 600px) {
-  .volumeSection .time,
-  .volumeSection span,
-  .volumeSlider { display: none; }
-  .volumeSection { width: auto; }
-  .songInfo { min-width: 0; flex: 1; }
-  .controls { gap: 0; }
+/* ════════════════════════════
+   WAVE ANIMATION
+════════════════════════════ */
+.wave {
+  display: flex; align-items: center; gap: 3px; height: 32px;
 }
+.waveBar {
+  width: 3px; border-radius: 2px;
+  background: var(--accent);
+  animation: waveBar 0.8s ease-in-out infinite;
+  transform-origin: bottom;
+  min-height: 4px;
+}
+
+/* ════════════════════════════
+   QUEUE DRAWER
+════════════════════════════ */
+.queueOverlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 300;
+  display: flex; justify-content: flex-end;
+  animation: fadeIn 0.2s ease;
+}
+.queueDrawer {
+  width: 340px; max-width: 100vw;
+  height: 100vh;
+  background: #141414;
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  animation: slideRight 0.25s ease;
+  padding-bottom: 90px;
+  overflow: hidden;
+}
+.queueHead {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.queueTitle {
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 700;
+}
+.queueClose {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 16px;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.queueClose:hover { background: var(--bg-3); color: var(--text-1); }
+
+.queueNow {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  flex-shrink: 0;
+}
+.queueNowLabel {
+  display: block;
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--accent);
+  font-weight: 700; margin-bottom: 10px;
+  font-family: var(--font-display);
+}
+.queueList { flex: 1; overflow-y: auto; padding: 6px 0; }
+.queueEmpty { color: var(--text-3); font-size: 13px; padding: 20px; text-align: center; }
+
+.queueRow {
+  display: flex; align-items: center;
+  gap: 12px; padding: 8px 20px;
+  transition: background 0.12s;
+}
+.queueRow:hover { background: var(--bg-2); }
+.queueNum { font-size: 12px; color: var(--text-3); width: 16px; flex-shrink: 0; }
+.queueThumb {
+  width: 40px; height: 40px;
+  border-radius: 5px; object-fit: cover; flex-shrink: 0;
+}
+.queueRowInfo { overflow: hidden; }
+.queueSongTitle {
+  font-size: 13px; font-weight: 600; color: var(--text-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--font-body);
+}
+.queueSongArtist { font-size: 11px; color: var(--text-3); margin-top: 2px; }
