@@ -1,8 +1,25 @@
 // app/api/lyrics/route.js
+// Strategy:
+//   1. Supabase cache  → instant return if lyrics already fetched before (any user)
+//   2. Genius API      → song search, translation list, original-song follow
+//   3. ScraperAPI      → proxy the Genius page fetch (bypasses 403 on Vercel)
+//   4. cheerio         → scrape lyrics from proxied HTML
+//   5. Save to cache   → stored in songs.lyrics so next request is instant from DB
+
+export const maxDuration = 30
+
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import * as cheerio from 'cheerio'
 
-const GENIUS_TOKEN = process.env.GENIUS_ACCESS_TOKEN
+const GENIUS_TOKEN     = process.env.GENIUS_ACCESS_TOKEN
+const SCRAPER_API_KEY  = process.env.SCRAPER_API_KEY
+
+// Service role client — needed to write lyrics back to DB server-side
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
 const SKIP_PATTERNS = [
   /translation/i, /translated/i,
@@ -15,18 +32,15 @@ function isTranslation(title) {
 }
 const normalise = (s) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()
 
-async function scrapePage(url) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-  })
-  if (!res.ok) throw new Error(`Page fetch failed: ${res.status}`)
+// ── Scrape a Genius page via ScraperAPI proxy ─────────────────────────────────
+async function scrapeGeniusPage(geniusUrl) {
+  const proxiedUrl = `http://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(geniusUrl)}`
+  const res = await fetch(proxiedUrl, { signal: AbortSignal.timeout(25000) })
+  if (!res.ok) throw new Error(`ScraperAPI fetch failed: ${res.status}`)
 
   const html = await res.text()
-  const $ = cheerio.load(html)
+  const $    = cheerio.load(html)
 
-  // ── Extract lyrics ──────────────────────────────────────────────────────
   const containers = $('[data-lyrics-container="true"]')
   if (containers.length === 0) throw new Error('NO_LYRICS')
 
@@ -35,84 +49,40 @@ async function scrapePage(url) {
     $(el).find('br').replaceWith('\n')
     lyrics += $(el).text() + '\n\n'
   })
-  lyrics = lyrics.replace(/\n{3,}/g, '\n\n').trim()
-
-  // ── Extract translations from the structured JSON Genius embeds ─────────
-  // Genius embeds a __NEXT_DATA__ JSON blob with song metadata including translations
-  const translations = []
-  
-  try {
-    const scriptContent = $('script#__NEXT_DATA__').text()
-    if (scriptContent) {
-      const json = JSON.parse(scriptContent)
-      // Walk the JSON to find translation_songs array
-      const songData = json?.props?.pageProps?.songPage?.song 
-        || json?.props?.pageProps?.song
-        || null
-      
-      const transSongs = songData?.translation_songs ?? []
-      for (const ts of transSongs) {
-        const langName = ts.language_name || ts.title || ''
-        const tsUrl    = ts.url || ''
-        if (langName && tsUrl && tsUrl.includes('genius.com')) {
-          translations.push({ label: langName, url: tsUrl })
-        }
-      }
-    }
-  } catch (_) {
-    // JSON parse failed — fall back to targeted link scraping below
-  }
-
-  // ── Fallback: scrape the Translations dropdown links if JSON failed ──────
-  if (translations.length === 0) {
-    // Genius renders translation links inside a specific nav section
-    // They always follow the pattern: /[artist-name]-[song-title]-[language]-translation-lyrics
-    // We extract them from the page URL pattern relative to the current song slug
-    const songSlug = url.split('/').pop().replace('-lyrics', '').replace('lyrics', '')
-    
-    $('a[href]').each((_, el) => {
-      const href  = $(el).attr('href') || ''
-      const text  = $(el).text().trim()
-      // Must be a genius.com lyrics link AND contain translation/romanization
-      if (
-        href.startsWith('https://genius.com/') &&
-        href.endsWith('-lyrics') &&
-        (href.includes('-translation-') || href.includes('-romanization-') || href.includes('-romanisation-')) &&
-        text.length > 0 && text.length < 60
-      ) {
-        if (!translations.find(t => t.url === href)) {
-          // Clean up label: remove redundant song/artist info if present
-          const cleanLabel = text
-            .replace(/translation/i, '')
-            .replace(/romanization/i, 'Romanized')
-            .replace(/romanisation/i, 'Romanized')
-            .replace(/\s+/g, ' ')
-            .trim()
-          translations.push({ label: cleanLabel || text, url: href })
-        }
-      }
-    })
-  }
-
-  return { lyrics, translations }
+  return lyrics.replace(/\n{3,}/g, '\n\n').trim()
 }
 
+// ── Genius API: song detail (translations + original follow) ──────────────────
+async function getGeniusSongDetail(songId) {
+  try {
+    const res = await fetch(`https://api.genius.com/songs/${songId}?text_format=plain`, {
+      headers: { Authorization: `Bearer ${GENIUS_TOKEN}` },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.response?.song ?? null
+  } catch {
+    return null
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const directUrl = searchParams.get('url')?.trim()
 
-  // Mode 2: direct URL fetch (translation pages)
+  // ── Mode 2: translation by direct Genius URL ──────────────────────────────
   if (directUrl) {
     try {
-      const { lyrics, translations } = await scrapePage(directUrl)
-      return NextResponse.json({ lyrics, translations, geniusUrl: directUrl })
-    } catch (err) {
-      const msg = err.message === 'NO_LYRICS' ? 'Lyrics not available' : 'Failed to fetch'
-      return NextResponse.json({ error: msg }, { status: 404 })
+      const lyrics = await scrapeGeniusPage(directUrl)
+      return NextResponse.json({ lyrics, translations: [], geniusUrl: directUrl })
+    } catch {
+      return NextResponse.json({ error: 'Lyrics not available for this translation' }, { status: 404 })
     }
   }
 
-  // Mode 1: search by artist + title
+  // ── Mode 1: search by artist + title ─────────────────────────────────────
   const artist = searchParams.get('artist')?.trim()
   const title  = searchParams.get('title')?.trim()
   if (!artist || !title) {
@@ -120,31 +90,43 @@ export async function GET(request) {
   }
 
   try {
-    const query = encodeURIComponent(`${title} ${artist}`)
+    // ── Step 1: Check Supabase cache first ───────────────────────────────────
+    const { data: cached } = await supabase
+      .from('songs')
+      .select('lyrics')
+      .ilike('title', title)
+      .ilike('artist', `%${artist}%`)
+      .not('lyrics', 'is', null)
+      .maybeSingle()
+
+    if (cached?.lyrics) {
+      return NextResponse.json({ lyrics: cached.lyrics, translations: [], fromCache: true })
+    }
+
+    // ── Step 2: Search Genius API ─────────────────────────────────────────────
+    const query     = encodeURIComponent(`${title} ${artist}`)
     const searchRes = await fetch(`https://api.genius.com/search?q=${query}`, {
       headers: { Authorization: `Bearer ${GENIUS_TOKEN}` },
-      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(5000),
     })
     if (!searchRes.ok) return NextResponse.json({ error: 'Genius search failed' }, { status: 502 })
 
-    const searchData = await searchRes.json()
-    const hits = searchData?.response?.hits ?? []
-    if (hits.length === 0) return NextResponse.json({ error: 'Song not found' }, { status: 404 })
+    const hits = (await searchRes.json())?.response?.hits ?? []
+    if (hits.length === 0) return NextResponse.json({ error: 'Song not found on Genius' }, { status: 404 })
 
+    // ── Step 3: Pick best result ──────────────────────────────────────────────
     const results    = hits.map(h => h.result)
     const originals  = results.filter(r => !isTranslation(r.full_title))
     const artistNorm = normalise(artist)
     const titleNorm  = normalise(title)
 
     let best = null
-    // Best: artist + title match, not a translation
     for (const r of originals) {
       if (
         normalise(r.primary_artist?.name ?? '').includes(artistNorm) &&
         normalise(r.title ?? '').includes(titleNorm)
       ) { best = r; break }
     }
-    // Fallback: title match only
     if (!best) for (const r of originals) {
       if (normalise(r.title ?? '').includes(titleNorm)) { best = r; break }
     }
@@ -153,63 +135,37 @@ export async function GET(request) {
 
     let songUrl   = best.url
     let songTitle = best.full_title
-    const thumbnail = best.song_art_image_thumbnail_url ?? null
 
-    // If best result IS a translation (no original found), try to follow back to original
-    const bestIsTranslation = isTranslation(best.full_title)
+    // ── Step 4: Get translations + follow back to original if needed ──────────
+    const detail       = await getGeniusSongDetail(best.id)
+    const translations = (detail?.translation_songs ?? [])
+      .filter(ts => ts.url && ts.language_name)
+      .map(ts => ({ label: ts.language_name, url: ts.url }))
 
-    // Use Genius API to get song details including translations list
-    // This is more reliable than scraping
-    let apiTranslations = []
-    try {
-      const songId   = best.id
-      const detailRes = await fetch(`https://api.genius.com/songs/${songId}?text_format=plain`, {
-        headers: { Authorization: `Bearer ${GENIUS_TOKEN}` },
-        next: { revalidate: 3600 },
-      })
-      if (detailRes.ok) {
-        const detail = await detailRes.json()
-        const transSongs = detail?.response?.song?.translation_songs ?? []
-        for (const ts of transSongs) {
-          const langName = ts.language_name || ''
-          const tsUrl    = ts.url || ''
-          if (langName && tsUrl) {
-            apiTranslations.push({ label: langName, url: tsUrl })
-          }
-        }
-      }
-    } catch (_) {}
-
-    // If we landed on a translation page, try to find and use the original
-    if (bestIsTranslation) {
-      try {
-        const songId    = best.id
-        const detailRes2 = await fetch(`https://api.genius.com/songs/${songId}?text_format=plain`, {
-          headers: { Authorization: `Bearer ${GENIUS_TOKEN}` },
-        })
-        if (detailRes2.ok) {
-          const detail2 = await detailRes2.json()
-          const origSong = detail2?.response?.song?.translation_of
-          if (origSong?.url) {
-            songUrl   = origSong.url
-            songTitle = origSong.full_title ?? songTitle
-          }
-        }
-      } catch (_) {}
+    if (isTranslation(best.full_title) && detail?.translation_of?.url) {
+      songUrl   = detail.translation_of.url
+      songTitle = detail.translation_of.full_title ?? songTitle
     }
 
-    const { lyrics, translations: scrapedTrans } = await scrapePage(songUrl)
+    // ── Step 5: Scrape lyrics via ScraperAPI ──────────────────────────────────
+    const lyrics = await scrapeGeniusPage(songUrl)
 
-    // Prefer API translations (accurate), fall back to scraped
-    const translations = apiTranslations.length > 0 ? apiTranslations : scrapedTrans
+    // ── Step 6: Save to Supabase cache ────────────────────────────────────────
+    // Fire-and-forget — don't await, don't block the response
+    supabase
+      .from('songs')
+      .update({ lyrics })
+      .ilike('title', title)
+      .ilike('artist', `%${artist}%`)
+      .then(() => {}) // silence unhandled promise warning
 
-    return NextResponse.json({ lyrics, songTitle, geniusUrl: songUrl, thumbnail, translations })
+    return NextResponse.json({ lyrics, songTitle, geniusUrl: songUrl, translations })
 
   } catch (err) {
     if (err.message === 'NO_LYRICS') {
       return NextResponse.json({ error: 'Lyrics not available for this song' }, { status: 404 })
     }
-    console.error('[lyrics route]', err)
+    console.error('[lyrics route]', err.message)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
